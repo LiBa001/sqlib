@@ -1,8 +1,12 @@
-import sqlite3
-import functools
 from .column import Column
+from . import tools
 from .variables import CONFIG
-from .functions import *
+from .errors import DatabaseError
+import logging
+
+logger = logging.getLogger('sqlib')
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
 
 class Table:
@@ -11,14 +15,18 @@ class Table:
         self._name = None
         self.name = name
 
-        self._conn = sqlite3.connect(CONFIG['database'])
+        self._conn = CONFIG['connection']
         self._c = self._conn.cursor()
 
         self._c.execute(f"PRAGMA TABLE_INFO ({self.name})")
+        table_info = self._c.fetchall()
+
+        if not table_info:
+            raise DatabaseError(f"Given table (\"{name}\") doesn't exist.")
 
         self._columns = list(map(
-            lambda x: Column(x[1], x[2], not_null=bit_to_bool(x[3]), default=x[4], primary_key=bit_to_bool(x[5])),
-            self._c.fetchall()
+            lambda x: Column(x[1], x[2], not_null=tools.bit_to_bool(x[3]), default=x[4], primary_key=tools.bit_to_bool(x[5])),
+            table_info
             ))
 
     @property
@@ -36,25 +44,7 @@ class Table:
 
     @property
     def string(self):
-        primaries = [column for column in self.columns if column.PRIMARY_KEY is True]
-
-        if len(primaries) > 1:
-            def_primaries = f", PRIMARY KEY ({functools.reduce(lambda x, y: x.name+', '+y.name, primaries)})"
-
-            def_columns = []
-            for column in self.columns:
-                if column in primaries:
-                    def_columns.append(column.string.replace(" PRIMARY KEY", ""))
-                else:
-                    def_columns.append(column.string)
-
-        else:
-            def_primaries = ""
-            def_columns = [col.string for col in self.columns]
-
-        def_columns = functools.reduce(lambda x, y: x + ', ' + y, def_columns)
-
-        return "CREATE TABLE IF NOT EXISTS {0} ({1}{2})".format(self.name, def_columns, def_primaries)
+        return tools.get_table_create_string(self.name, *self.columns)
 
     def get(self, column, value, only_column: str=None, fetch=1):
         if only_column is None:
@@ -82,10 +72,20 @@ class Table:
         return self._tuplist_to_dictlist(self._c.fetchall())
 
     def insert(self, values: dict):
-        cols_str = functools.reduce(lambda x, y: f"{x}, {y}", map(lambda x: '?', self.columns))
+        cols = list(map(
+                lambda x: x.name,
+                filter(lambda x: x.default is None or values.get(x.name, None) is not None, self.columns)
+        ))
+        qm_str = tools.concat(list(map(lambda x: '?', cols)))
+
+        cols_str = tools.concat(cols)
 
         with self._conn:
-            self._c.execute(f"INSERT INTO {self.name} VALUES ({cols_str})", self._dict_to_tup(values))
+            if not cols:
+                logger.info("Inserting only default values.")
+                self._c.execute(f"INSERT INTO {self.name} DEFAULT VALUES")
+            else:
+                self._c.execute(f"INSERT INTO {self.name} ({cols_str}) VALUES ({qm_str})", self._dict_to_tup(values))
         return values
 
     def update(self, column, value, new_values: dict):
@@ -93,7 +93,7 @@ class Table:
             self._c.execute(
                 "UPDATE {0} SET {1} WHERE {2}={3}".format(
                     self.name,
-                    functools.reduce(lambda x, y: f"{x},{y}", map(lambda col: f"{col}=:{col}", new_values)),
+                    tools.concat(map(lambda col: f"{col}=:{col}", new_values)),
                     column,
                     value
                 ),
@@ -122,5 +122,10 @@ class Table:
     def _dict_to_tup(self, dic):
         lst = []
         for col in self.columns:
-            lst.append(dic.get(col.name, None))
+            if col.default is None:
+                lst.append(dic.get(col.name, None))
+
+            elif dic.get(col.name) is not None:
+                lst.append(dic[col.name])
+
         return tuple(lst)

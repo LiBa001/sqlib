@@ -3,7 +3,7 @@
 Sqlib is a wrapper for a simple handling of sqlite3 databases, so you don't have to use sqlite statements anymore.
 You can easily handle your database by instances of the tables.
 
-Sqlib doesn't provide full sqlite possibilities and it can only be used to manage table rows.
+Sqlib doesn't provide full sqlite possibilities and it can only be used for one database.
 
 ## Examples
 
@@ -11,7 +11,7 @@ Sqlib doesn't provide full sqlite possibilities and it can only be used to manag
 ```Python
 from sqlib import *
 
-CONFIG['database'] = "company.db"  # set db file (default is ':memory:')
+connect("company.db")  # set db file (default is ':memory:')
 
 employees = Table('employees')  # create an instance for your table
 ```
@@ -57,4 +57,15 @@ employees.update('id', 1337, {'lastname': 'Torvalds'})
 ### Delete
 ```Python
 employees.delete('id', 1337)
+```
+
+### Create new table
+```Python
+create_table("customers",
+            Column("firstname", TEXT, not_null=True),
+            Column("lastname", TEXT, not_null=True),
+            Column("email", TEXT, not_null=True, unique=True),
+            Column("prime_member", INTEGER, default=0),
+            Column("delivery_address", TEXT)
+            )
 ```

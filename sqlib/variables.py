@@ -1,3 +1,5 @@
+import sqlite3
+
 TEXT = "TEXT"
 INTEGER = "INTEGER"
 REAL = "REAL"
@@ -6,4 +8,4 @@ NUMERIC = "NUMERIC"
 
 AFFINITIES = [TEXT, INTEGER, REAL, NONE, NUMERIC]
 
-CONFIG = {'database': ":memory:"}
+CONFIG = {'connection': sqlite3.connect(':memory:', check_same_thread=False)}

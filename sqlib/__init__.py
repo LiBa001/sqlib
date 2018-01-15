@@ -1,12 +1,8 @@
-__author__ = 'Linus Bartsch'
-__title__ = 'sqlib'
-__license__ = 'MIT'
-__version__ = '0.0.1'
-
 from .table import Table
 from .column import Column
 from .variables import *
 from .errors import *
+from .database import create_table, connect
 
 import logging
 
@@ -18,3 +14,8 @@ except ImportError:
             pass
 
 logging.getLogger(__name__).addHandler(NullHandler())
+
+__author__ = 'Linus Bartsch'
+__title__ = 'sqlib'
+__license__ = 'MIT'
+__version__ = '0.0.1'

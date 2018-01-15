@@ -18,3 +18,10 @@ class DefaultValueError(SqlibError):
     def __init__(self):
         message = 'Default value does not match the affinity of the column.'
         super(DefaultValueError, self).__init__(message)
+
+
+class DatabaseError(SqlibError):
+    """ Exception that's thrown when an operation is in conflict with the sqlite database. """
+
+    def __init__(self, message):
+        super(DatabaseError, self).__init__(message)
